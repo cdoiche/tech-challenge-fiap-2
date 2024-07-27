@@ -1,0 +1,40 @@
+version: '3.8'
+
+networks:
+  my-network:
+
+services:
+  webapi:
+    networks:
+      - my-network
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=db;Port=5432;Database=desafio_1;User Id=postgres;Password=123!asd;
+      - ASPNETCORE_URLS=http://+:80
+
+
+  db:
+    networks:
+      - my-network
+    image: postgres:13
+    environment:
+      POSTGRES_DB: desafio_1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123!asd
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
