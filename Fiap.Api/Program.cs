@@ -3,6 +3,8 @@ using Fiap.Api.Configuration;
 using Fiap.Api.Interfaces;
 using Fiap.Domain.Repositories;
 using Fiap.Infra.Context;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +12,18 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
+Action<ResourceBuilder> appResourceBuilder = resource => resource.AddContainerDetector()
+                                                                 .AddHostDetector();
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(appResourceBuilder)
+    .WithMetrics(meterBuilder =>meterBuilder
+        .AddProcessInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter() // otlpOptions => { otlpOptions.Endpoint = new Uri("http://otel-collector:4317"); }
+    );
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -25,6 +39,8 @@ builder.Services.AddCors(options =>
 ServiceConfiguration.ConfigureServices(builder);
 
 var app = builder.Build();
+
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
 // Run initial migrations
 using (var scope = app.Services.CreateScope())

@@ -1,6 +1,9 @@
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
+EXPOSE 5131
+
+ENV ASPNETCORE_URLS=http://+:5131
 
 # Copy the project file and restore dependencies
 COPY ["./Fiap.Api/Fiap.Api.csproj", "./"]
@@ -25,6 +28,6 @@ ENV PATH="/root/.dotnet/tools:$PATH"
 RUN dotnet tool install --global dotnet-ef
 
 # Copy published application from build stage (if using multi-stage build, skip this)
-COPY --from=build /app/publish .
+COPY --from=publish /app/publish .
 
 ENTRYPOINT ["dotnet", "Fiap.Api.dll"]

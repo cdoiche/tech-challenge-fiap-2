@@ -1,28 +1,29 @@
 version: '3.8'
 
 networks:
-  my-network:
+  monitoring:
+    driver: bridge
 
 services:
   webapi:
     networks:
-      - my-network
+      - monitoring
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:80"
+      - 5131:5131
     depends_on:
+      - otel-collector
       - db
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=db;Port=5432;Database=desafio_1;User Id=postgres;Password=123!asd;
-      - ASPNETCORE_URLS=http://+:80
-
-
+      Otlp__Endpoint: http://otel-collector:4317
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Server=db;Port=5432;Database=desafio_1;User Id=postgres;Password=123!asd;
+      ASPNETCORE_URLS: http://+:5131
   db:
     networks:
-      - my-network
+      - monitoring
     image: postgres:13
     environment:
       POSTGRES_DB: desafio_1
@@ -35,6 +36,60 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  otel-collector:
+    image: otel/opentelemetry-collector:0.95.0
+    hostname: otel-collector
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "8888:8888" 
+      - "8889:8889" 
+      - "13133:13133"
+      - "4317:4317"
+    networks:
+      - monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - '3000:3000'
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:v1.5.0
+    container_name: node_exporter
+    command: '--path.rootfs=/host'
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - monitoring
 
 volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
   postgres_data:
