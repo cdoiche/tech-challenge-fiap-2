@@ -13,9 +13,8 @@ RUN dotnet restore "Fiap.Api.csproj"
 COPY ./Fiap.Api/ .
 
 # Build and publish the application
-RUN dotnet build "Fiap.Api.csproj" -c Release -o /app/build
+RUN dotnet build "Fiap.Api.csproj" -c Development -o /app/build
 
-RUN dotnet publish "Fiap.Api.csproj" -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS runtime
@@ -28,6 +27,6 @@ ENV PATH="/root/.dotnet/tools:$PATH"
 RUN dotnet tool install --global dotnet-ef
 
 # Copy published application from build stage (if using multi-stage build, skip this)
-COPY --from=publish /app/publish .
+COPY --from=build /app/build .
 
 ENTRYPOINT ["dotnet", "Fiap.Api.dll"]

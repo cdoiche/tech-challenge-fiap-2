@@ -1,29 +1,15 @@
 // Program.cs
 using Fiap.Api.Configuration;
-using Fiap.Api.Interfaces;
-using Fiap.Domain.Repositories;
 using Fiap.Infra.Context;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using System.Text.Json.Serialization;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Action<ResourceBuilder> appResourceBuilder = resource => resource.AddContainerDetector()
-                                                                 .AddHostDetector();
+ServiceConfiguration.ConfigureServices(builder);
 
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(appResourceBuilder)
-    .WithMetrics(meterBuilder =>meterBuilder
-        .AddProcessInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddOtlpExporter() // otlpOptions => { otlpOptions.Endpoint = new Uri("http://otel-collector:4317"); }
-    );
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -36,11 +22,7 @@ builder.Services.AddCors(options =>
                    .AllowAnyMethod());
 });
 
-ServiceConfiguration.ConfigureServices(builder);
-
 var app = builder.Build();
-
-app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
 // Run initial migrations
 using (var scope = app.Services.CreateScope())
@@ -59,7 +41,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -68,13 +49,40 @@ if (app.Environment.IsDevelopment())
     app.UseCors("AllowAllOrigins");
 }
 
+
 app.UseHttpsRedirection();
 
 app.UseCors("AllowAllOrigins");
 
 app.UseAuthorization();
 
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    AllowCachingResponses = false,
+    ResultStatusCodes =
+                {
+                    [HealthStatus.Healthy] = StatusCodes.Status200OK,
+                    [HealthStatus.Degraded] = StatusCodes.Status200OK,
+                    [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+                }
+});
+
+var counter = Metrics.CreateCounter("webapimetric", "Counts requests to the WebApiMetrics API endpoints",
+    new CounterConfiguration
+    {
+        LabelNames = new[] { "method", "endpoint" }
+    });
+
+app.Use((context, next) =>
+{
+    counter.WithLabels(context.Request.Method, context.Request.Path).Inc();
+    return next();
+});
+
+app.UseMetricServer();
+app.UseHttpMetrics();
+
 app.MapControllers();
 app.Run();
 
-public partial class Program { } // To make the Program class accessible for testing
+public partial class Program { }

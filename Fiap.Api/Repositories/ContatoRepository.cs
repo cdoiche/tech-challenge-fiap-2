@@ -118,6 +118,7 @@ namespace Fiap.Domain.Repositories
             // Filtrar os contatos pelo DDD e ordenar pelo nome
             if (!string.IsNullOrEmpty(ddd))
             {
+                Console.WriteLine("Fazendo Where na tabela Contatos");
                 return _context.Contatos.Where(x => x.Ddd == ddd).OrderBy(x => x.Nome);
             }
             else

@@ -1,4 +1,5 @@
-﻿using Fiap.Api.Entities;
+﻿using Fiap.Api.Configuration;
+using Fiap.Api.Entities;
 using Fiap.Api.Interfaces;
 using Fiap.Api.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -8,10 +9,12 @@ namespace Fiap.Api.Controllers
     [ApiController]
     public class ContatoController : ControllerBase
     {
+        private readonly Instrumentor _instrumentor;
         private readonly IContatoRepository _contatoRepository;
 
-        public ContatoController(IContatoRepository contatoRepository)
+        public ContatoController(Instrumentor instrumentor, IContatoRepository contatoRepository)
         {
+            _instrumentor = instrumentor;
             _contatoRepository = contatoRepository;
         }
 
@@ -101,8 +104,13 @@ namespace Fiap.Api.Controllers
         [HttpGet("ConsultarContato")]
         public IActionResult ConsultarContato(string ddd)
         {
+            _instrumentor.IncomingRequestCounter.Add(1,
+           new KeyValuePair<string, object>("operation", "ConsultarContato"),
+           new KeyValuePair<string, object>("controller", nameof(ContatoController)));
+
             try
             {
+                Console.WriteLine("Trying to ConsultarContadosPorDDD");
                 IEnumerable<Contato> list = _contatoRepository.ConsultarContatosPorDDD(ddd);
 
                 return Ok(list);
